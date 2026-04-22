@@ -92,23 +92,26 @@ QVariantMap NetworkControl::GetActiveDevice() {
     return details;
 }
 
-QList<QVariantMap> NetworkControl::GetDevices() {
+// This returns EVERY device NM knows about, regardless of state
+QList<QVariantMap> NetworkControl::GetAllDevices() {
     QList<QVariantMap> devices;
     if (!m_dbusConn) return devices;
 
     GError *error = nullptr;
-    // Get the list of object paths for all devices
     GVariant *result = g_dbus_connection_call_sync(m_dbusConn,
         "org.freedesktop.NetworkManager",        
         "/org/freedesktop/NetworkManager",
         "org.freedesktop.NetworkManager",
         "GetDevices",
-        NULL,
+        nullptr,
         G_VARIANT_TYPE("(ao)"),
         G_DBUS_CALL_FLAGS_NONE, -1, nullptr, &error);
     
-    if (result) {
-        if (error) { qWarning() << "GetDevices failed:" << error->message; g_error_free(error); }
+    if (!result) {
+        if (error) {
+            qWarning() << "GetAllDevices failed:" << error->message;
+            g_error_free(error);
+        }
         return devices;
     }
 
@@ -116,34 +119,9 @@ QList<QVariantMap> NetworkControl::GetDevices() {
     const gchar *devPath;
     g_variant_get(result, "(ao)", &iter);
     
+    // Process each path found
     while (g_variant_iter_loop(iter, "o", &devPath)) {
-        QVariantMap info;
-        info["DevicePath"] = QString::fromUtf8(devPath);
-
-        GVariant *props = g_dbus_connection_call_sync(m_dbusConn,
-            "org.freedesktop.NetworkManager",        
-            devPath,
-            "org.freedesktop.DBus.Properties",
-            "GetAll",
-            g_variant_new("(s)", "org.freedesktop.NetworkManager.Device"),
-            G_VARIANT_TYPE("(a{sv})"),
-            G_DBUS_CALL_FLAGS_NONE, -1, nullptr, &error);
-
-        if (props) {
-            GVariantIter *dictIter;
-            g_variant_get(props, "(a{sv})", &dictIter);
-
-            const gchar *key;
-            GVariant *val;
-            // Use 'sv' and 'iter_next' to ensure QML-compatible data ownership
-            while (g_variant_iter_next(dictIter, "{sv}", &key, &val)) {                    
-                info[QString::fromUtf8(key)] = gvariantToQVariant(val);
-                g_variant_unref(val); 
-            }
-            g_variant_iter_free(dictIter);
-            g_variant_unref(props);
-        }
-        devices.append(info);
+        devices.append(GetDeviceProperties(devPath));
     }
 
     g_variant_iter_free(iter);
@@ -465,4 +443,35 @@ void NetworkControl::DisconnectDevice(const QString &devicePath) {
     } else {
         qDebug() << "Disconnect command sent successfully to" << devicePath;
     }
+}
+
+QVariantMap NetworkControl::GetDeviceProperties(const QString &devicePath) {
+    QVariantMap info;
+    if (!m_dbusConn || devicePath.isEmpty() || devicePath == "/") return info;
+
+    info["DevicePath"] = devicePath;
+
+    GVariant *props = g_dbus_connection_call_sync(m_dbusConn,
+        "org.freedesktop.NetworkManager",        
+        devicePath.toUtf8().constData(),
+        "org.freedesktop.DBus.Properties",
+        "GetAll",
+        g_variant_new("(s)", "org.freedesktop.NetworkManager.Device"),
+        G_VARIANT_TYPE("(a{sv})"),
+        G_DBUS_CALL_FLAGS_NONE, -1, nullptr, nullptr);
+
+    if (props) {
+        GVariantIter *dictIter;
+        g_variant_get(props, "(a{sv})", &dictIter);
+
+        const gchar *key;
+        GVariant *val;
+        while (g_variant_iter_next(dictIter, "{sv}", &key, &val)) {                    
+            info[QString::fromUtf8(key)] = gvariantToQVariant(val);
+            g_variant_unref(val); 
+        }
+        g_variant_iter_free(dictIter);
+        g_variant_unref(props);
+    }
+    return info;
 }

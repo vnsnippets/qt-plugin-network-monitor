@@ -26,23 +26,34 @@ A Quickshell/QML plugin that talks directly to **NetworkManager** over **DBus** 
 
 Network Monitor (Singleton) `NetworkMonitor`
 
-| Property            | Type          |	Description                                       |
-|:--------------------|:--------------|:--------------------------------------------------|
-| `ConnectivityState`	| `int`         |	Internet reachability (0–4).                      |
-| `GlobalState`	      | `int`         |	Network Manager's internal state (10–70).         |
-| `ActiveDevice`	    | `QVariantMap` |	Properties of the currently used hardware device. |
-| `ActiveAccessPoint`	| `QVariantMap`	| SSID, Strength, and Path of current access point. |
+| Property            | Type          |	Description                                         |
+|:--------------------|:--------------|:----------------------------------------------------|
+| `ConnectivityState` | `int`         |	Internet reachability (0–4).                        |
+| `GlobalState`	      | `int`         |	Network Manager's internal state (10–70).           |
+| `ActiveDevice`	  | `QVariantMap` |	Properties of the currently used hardware device.   |
+| `ActiveAccessPoint` | `QVariantMap` | SSID, Strength, and Path of current access point.   |
 
-Key Signals:
+Key Signals
 
-- `scanFinished(QString devicePath)`: Fired when a Wi-Fi scan completes.
-- `deviceStateChanged(QString path, int state)`: Tracks individual hardware status.
-- `activeAccessPointChanged()`: Fired when roaming between Access Points or signal strength updates.
+| Signal                             | Purpose                                                              |
+|:-----------------------------------|:---------------------------------------------------------------------|
+| `onActiveDeviceChanged()`          | Network device in use has changed.                                   |
+| `connectivityStateChanged()`       | Connectivity state has changed.                                      |
+| `globalStateChanged()`             | Global connectivity state has changed.                               |
+| `deviceAdded(string)`              | Network device was added.                                            |
+| `deviceRemoved(string)`            | Network device was removed.                                          |
+| `scanFinished(string)`             | Network scanning completed (does not trigger if unchanged).          |
+| `deviceStateChanged(string, int)`  | Tracks individual hardware status.                                   |
+| `activeAccessPointChanged(string)` | Fired when roaming between Access Points or signal strength updates. |
 
 Network Control (Singleton) `NetworkControl`
 
 | Method                             | Returns     | Description                                                |
 |:-----------------------------------|:------------|:-----------------------------------------------------------|
+| `GetActiveDevice()`                | `Map`       | Returns currently active network device.                   |
+| `GetAllDevices()`                  | `List<Map>` | Returns currently all network device regardless of state.  |
+| `GetSettings(settingsPath)`        | `Map`       | Returns settings for a saved network.                      |
+| `GetAccessPoints(devicePath)`      | `List<Map>` | Returns list of available access points (based on scan).   |
 | `RequestScan(devicePath)`          | `void`      | Triggers an asynchronous Wi-Fi scan.                       |
 | `GetKnownNetworksInRange(path)`    | `List<Map>` | Returns SSIDs in range that you have passwords for.        |
 | `ActivateConnection(dev, set, ap)` | `void`      | Connects to a specific network.                            |

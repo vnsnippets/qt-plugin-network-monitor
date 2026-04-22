@@ -2,7 +2,7 @@ name: Build and Release Plugin
 
 on:
   release:
-    types: [created]
+    types: [published, created]
   workflow_dispatch:
     inputs:
       version:
@@ -42,11 +42,13 @@ jobs:
           fi
           CLEAN_VERSION=${VERSION#v}
           echo "version=$CLEAN_VERSION" >> $GITHUB_OUTPUT
+          echo "tag=$VERSION" >> $GITHUB_OUTPUT
           echo "Building version: $CLEAN_VERSION"
 
       - name: ⚙️ Configure CMake
+        # Pointing CMake to the ./code directory as the source root
         run: |
-          cmake -B build \
+          cmake -S code -B build \
             -DCMAKE_BUILD_TYPE=Release \
             -DBUILD_VERSION=${{ steps.get_version.outputs.version }}
 
@@ -64,7 +66,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          gh release upload ${{ github.event.release.tag_name }} \
+          gh release upload ${{ steps.get_version.outputs.tag }} \
             NetworkMonitorDBusPlugin.tar.gz \
             --clobber
 

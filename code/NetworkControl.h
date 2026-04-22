@@ -21,13 +21,16 @@ class NetworkControl : public QObject {
         ~NetworkControl();
 
         Q_INVOKABLE QVariantMap GetActiveDevice();
-        Q_INVOKABLE QList<QVariantMap> GetDevices();
+        Q_INVOKABLE QList<QVariantMap> GetAllDevices();
         Q_INVOKABLE QVariantMap GetSettings(const QString &settingsPath);
         Q_INVOKABLE void RequestScan(const QString &devicePath);
         Q_INVOKABLE QList<QVariantMap> GetAccessPoints(const QString &devicePath);
         Q_INVOKABLE QList<QVariantMap> GetKnownNetworksInRange(const QString &devicePath);
         Q_INVOKABLE void ActivateConnection(const QString &devicePath, const QString &settingsPath, const QString &accessPointPath);
         Q_INVOKABLE void DisconnectDevice(const QString &devicePath);
+
+
+        Q_INVOKABLE QVariantMap GetDeviceProperties(const QString &devicePath);
     private:
         GDBusConnection *m_dbusConn = nullptr;
 };
