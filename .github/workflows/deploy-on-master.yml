@@ -2,7 +2,7 @@ name: Build and Release Plugin
 
 on:
   release:
-    types: [published, created]
+    types: [released]
   workflow_dispatch:
     inputs:
       version:
