@@ -84,38 +84,43 @@ Connectivity `connectivityState`
 ### 🖥️ Sample QML Usage
 ```QML
 import QtQuick
-import MyNetworkPlugin 1.0
+import NetworkMonitorPlugin
 
 Item {
-    // 1. Monitor the connection
-    NetworkMonitor {
-        id: monitor
-        onConnectivityStateChanged: {
-            if (connectivityState === 4) console.log("We are online!")
-        }
+    // It's a Singleton.
+    // So no need to initialize - just use.
+
+    // 1. Connect your reactivity layer
+    Connections {
+        target: NetworkMonitor
+        function onScanFinished() { ... }
+        function onConnectivityStateChanged() { ... }
+        function onGlobalStateChanged() { ... }
+        function onDeviceAdded() { ... }
+        function onDeviceRemoved() { ... }
+        function onDeviceStateChanged() { ... }
+        function onActiveAccessPointChanged() { ... }
     }
 
     // 2. Control the hardware
-    NetworkControl {
-        id: control
-    }
-
     Column {
         anchors.centerIn: parent
-        
+
+        // This is how you read the properties from Network Monitor
         Text { 
-            text: "Active SSID: " + (monitor.activeAccessPoint.Ssid || "None")
-            color: monitor.connectivityState === 4 ? "green" : "red"
+            text: "Active SSID: " + (NetworkMonitor.ActiveAccessPoint.Ssid || "None")
+            color: NetworkMonitor.ConnectivityState === 4 ? "green" : "red"
         }
 
+        // This is how you trigger operations from Network Control
         Button {
             text: "Scan Wi-Fi"
-            onClicked: control.RequestScan(monitor.activeDevice.DevicePath)
+            onClicked: NetworkControl.RequestScan(NetworkMonitor.ActiveDevice.DevicePath)
         }
 
         Button {
             text: "Kill Connection"
-            onClicked: control.DisconnectDevice(monitor.activeDevice.DevicePath)
+            onClicked: NetworkControl.DisconnectDevice(NetworkMonitor.ActiveDevice.DevicePath)
         }
     }
 }
