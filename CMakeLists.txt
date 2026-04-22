@@ -17,6 +17,8 @@ pkg_check_modules(GLIB REQUIRED glib-2.0 gio-2.0)
 # Define the shared library plugin
 add_library(NetworkMonitorDBusPlugin SHARED
     NetworkMonitor.cpp
+    NetworkControl.cpp
+    Utilities.cpp
     plugin.cpp
 )
 

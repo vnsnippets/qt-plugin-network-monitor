@@ -1,7 +1,11 @@
-#include <gio/gio.h>
+// #include <gio/gio.h>
 #include "NetworkMonitor.h"
 #include <QDebug>
-#undef signals   // avoid clash
+
+#undef signals
+#include <gio/gio.h>
+
+#define signals Q_SIGNALS
 
 // --- Callbacks ---
 static void on_nm_state_changed(GDBusConnection*, const gchar*, const gchar*, const gchar*, const gchar*, GVariant* parameters, gpointer user_data) {

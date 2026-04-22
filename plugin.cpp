@@ -13,6 +13,7 @@
 #include <QtQml/QQmlExtensionPlugin>
 #include <QtQml/qqml.h> 
 #include "NetworkMonitor.h"
+#include "NetworkControl.h"
 
 class NetworkMonitorDBusPlugin : public QQmlExtensionPlugin {
     Q_OBJECT
@@ -21,6 +22,7 @@ class NetworkMonitorDBusPlugin : public QQmlExtensionPlugin {
 public:
     void registerTypes(const char *uri) override {
         qmlRegisterType<NetworkMonitor>(uri, 1, 0, "NetworkMonitor");
+        qmlRegisterType<NetworkControl>(uri, 1, 0, "NetworkControl");
     }
 };
 
