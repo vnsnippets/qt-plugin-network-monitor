@@ -5,7 +5,7 @@
 
 ### 🛠️ Arch Rice: NetworkManager D-Bus Plugin
 
-A Quickshell plugin that talks directly to **NetworkManager** over **DBus** without middleware, polling, regex hacks or external processes, built for QML to be lighter and more customizable than standard applets.
+A Quickshell/QML plugin that talks directly to **NetworkManager** over **DBus** without middleware, polling, regex hacks or external processes, built for QML to be lighter and more customizable than standard applets.
 
 > Clean signals and properties exposed to QML
 
