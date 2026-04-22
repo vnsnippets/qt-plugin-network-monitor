@@ -96,6 +96,35 @@ static void on_device_removed(GDBusConnection*, const gchar*, const gchar*, cons
     emit monitor->deviceRemoved(QString::fromUtf8(path));
 }
 
+static void on_ap_props_changed(GDBusConnection*, const gchar*, const gchar*, const gchar*, const gchar*, GVariant* parameters, gpointer user_data) {
+    auto monitor = static_cast<NetworkMonitor*>(user_data);
+    
+    GVariant *changed_props;
+    // Parameters: (InterfaceName, ChangedProperties, InvalidatedProperties)
+    g_variant_get(parameters, "(&s@a{sv}@as)", nullptr, &changed_props, nullptr);
+
+    GVariantDict dict;
+    g_variant_dict_init(&dict, changed_props);
+    
+    // 3. Check if "Strength" is actually in this specific update
+    if (g_variant_dict_contains(&dict, "Strength")) {
+        GVariant *vStrength = g_variant_dict_lookup_value(&dict, "Strength", G_VARIANT_TYPE_BYTE);
+        if (vStrength) {
+            int newStrength = (int)g_variant_get_byte(vStrength);
+            
+            // 4. Update the QVariantMap safely on the main thread
+            QMetaObject::invokeMethod(monitor, [monitor, newStrength]() {
+                QVariantMap ap = monitor->activeAccessPoint();
+                ap["Strength"] = newStrength;
+                monitor->SetActiveAccessPoint(ap); 
+            }, Qt::QueuedConnection);
+
+            g_variant_unref(vStrength);
+        }
+    }
+    g_variant_unref(changed_props);
+}
+
 // Similar callbacks can be added for ActiveConnection and Settings signals…
 
 // --- Constructor ---
@@ -229,6 +258,16 @@ void NetworkMonitor::RefreshActiveDevice() {
                         }
                         
                         newDevice["DevicePath"] = QString::fromUtf8(devicePath);
+
+                        // Device Type 2: WiFi | Device Type 30: P2P WiFi
+                        if (newDevice["DeviceType"].toInt() == 2) { // 2 = Wireless
+                            RefreshActiveAccessPoint(newDevice["DevicePath"].toString());
+                        } else {
+                            // Clear AP data if we switched to Ethernet
+                            m_activeAccessPoint.clear();
+                            emit activeAccessPointChanged();
+                        }
+
                         g_variant_unref(propDict);
                         g_variant_unref(allProps);
                     }
@@ -250,4 +289,94 @@ void NetworkMonitor::RefreshActiveDevice() {
     }
     
     g_object_unref(conn); // Cleanup temporary connection
+}
+
+void NetworkMonitor::RefreshActiveAccessPoint(const QString &devicePath) {
+    GError *error = nullptr;
+    GDBusConnection *conn = g_bus_get_sync(G_BUS_TYPE_SYSTEM, nullptr, &error);
+    if (!conn) return;
+
+    // 1. Get the 'ActiveAccessPoint' property from the Wireless Device
+    GVariant *vAp = g_dbus_connection_call_sync(conn,
+        "org.freedesktop.NetworkManager", devicePath.toUtf8().constData(),
+        "org.freedesktop.DBus.Properties", "Get",
+        g_variant_new("(ss)", "org.freedesktop.NetworkManager.Device.Wireless", "ActiveAccessPoint"),
+        G_VARIANT_TYPE("(v)"), G_DBUS_CALL_FLAGS_NONE, -1, nullptr, nullptr);
+
+    if (vAp) {
+        GVariant *vPath;
+        g_variant_get(vAp, "(v)", &vPath);
+        QString apPath = QString::fromUtf8(g_variant_get_string(vPath, nullptr));
+
+        if (apPath != "/" && !apPath.isEmpty()) {
+            // 2. Get all AP properties (Ssid, Strength, Frequency, etc.)
+            GVariant *allProps = g_dbus_connection_call_sync(conn,
+                "org.freedesktop.NetworkManager", apPath.toUtf8().constData(),
+                "org.freedesktop.DBus.Properties", "GetAll",
+                g_variant_new("(s)", "org.freedesktop.NetworkManager.AccessPoint"),
+                G_VARIANT_TYPE("(a{sv})"), G_DBUS_CALL_FLAGS_NONE, -1, nullptr, nullptr);
+
+            if (allProps) {
+                GVariant *propDict;
+                g_variant_get(allProps, "(@a{sv})", &propDict);
+                
+                QVariantMap apDetails;
+                GVariantIter pIter;
+                g_variant_iter_init(&pIter, propDict);
+                const gchar *key;
+                GVariant *val;
+
+                while (g_variant_iter_next(&pIter, "{sv}", &key, &val)) {
+                    apDetails[QString::fromUtf8(key)] = gvariantToQVariant(val);
+                    g_variant_unref(val);
+                }
+
+                apDetails["Path"] = apPath; // Keep the path for monitoring
+                
+                // Thread safety: Update the member variable
+                m_activeAccessPoint = apDetails;
+                emit activeAccessPointChanged();
+                
+                SubscribeToAccessPointStrength(apPath);
+                g_variant_unref(propDict);
+                g_variant_unref(allProps);
+            }
+        }
+        g_variant_unref(vPath);
+        g_variant_unref(vAp);
+    }
+    g_object_unref(conn);
+}
+
+void NetworkMonitor::SubscribeToAccessPointStrength(const QString &apPath) {
+    GDBusConnection *conn = g_bus_get_sync(G_BUS_TYPE_SYSTEM, nullptr, nullptr);
+    
+    // 1. Clean up previous subscription to prevent memory leaks/multiple triggers
+    if (m_apSubscriptionId > 0) {
+        g_dbus_connection_signal_unsubscribe(conn, m_apSubscriptionId);
+        m_apSubscriptionId = 0;
+    }
+
+    // 2. Only subscribe if we have a valid AP path (not "/" or empty)
+    if (apPath != "/" && !apPath.isEmpty()) {
+        m_apSubscriptionId = g_dbus_connection_signal_subscribe(conn,
+            "org.freedesktop.NetworkManager",            // Sender
+            "org.freedesktop.DBus.Properties",           // Interface
+            "PropertiesChanged",                         // Member
+            apPath.toUtf8().constData(),                 // SPECIFIC Object Path
+            "org.freedesktop.NetworkManager.AccessPoint", // arg0 (Interface name)
+            G_DBUS_SIGNAL_FLAGS_NONE,
+            on_ap_props_changed,                         // Callback function
+            this,                                        // User data
+            nullptr);
+    }
+    g_object_unref(conn);
+}
+
+void NetworkMonitor::SetActiveAccessPoint(const QVariantMap &ap) {
+    if (m_activeAccessPoint != ap) {
+        m_activeAccessPoint = ap;
+        emit activeAccessPointChanged();
+        // Optional: qDebug() << "Active AP Strength updated:" << ap["Strength"].toInt();
+    }
 }
