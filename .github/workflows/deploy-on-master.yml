@@ -28,7 +28,6 @@ jobs:
             cmake \
             pkg-config \
             libglib2.0-dev \
-            libgio2.0-dev \
             qt6-base-dev \
             qt6-declarative-dev
 
@@ -41,7 +40,6 @@ jobs:
           else
             VERSION="${{ github.event.release.tag_name }}"
           fi
-          # Strip 'v' prefix
           CLEAN_VERSION=${VERSION#v}
           echo "version=$CLEAN_VERSION" >> $GITHUB_OUTPUT
           echo "Building version: $CLEAN_VERSION"
@@ -58,7 +56,6 @@ jobs:
       - name: 📦 Package Artifacts
         run: |
           cd build
-          # We use wildcard to catch the .so in case prefix/suffix varies
           tar -cvzf ../NetworkMonitorDBusPlugin.tar.gz *NetworkMonitorDBusPlugin.so qmldir
           cd ..
 
