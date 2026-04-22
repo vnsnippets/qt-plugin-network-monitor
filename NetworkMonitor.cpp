@@ -92,7 +92,9 @@ static void on_nm_properties_changed(GDBusConnection* m_dbusConn, const gchar*, 
         // Only refresh device if the connections list actually changed
         if (g_variant_lookup_value(changed, "ActiveConnections", nullptr) || 
             g_variant_lookup_value(changed, "PrimaryConnection", nullptr)) {
-            QMetaObject::invokeMethod(monitor, "RefreshActiveDevice", Qt::QueuedConnection);
+            QMetaObject::invokeMethod(monitor, [monitor]() {
+                monitor->RefreshActiveDevice();
+            }, Qt::QueuedConnection);
         }
     }
     g_variant_unref(changed);
@@ -212,6 +214,8 @@ NetworkMonitor::~NetworkMonitor() {
         if (m_wirelessPropsSubId > 0) g_dbus_connection_signal_unsubscribe(m_dbusConn, m_wirelessPropsSubId);
         if (m_deviceStateSubId > 0) g_dbus_connection_signal_unsubscribe(m_dbusConn, m_deviceStateSubId);
         if (m_apSubscriptionId > 0) g_dbus_connection_signal_unsubscribe(m_dbusConn, m_apSubscriptionId);
+
+        m_dbusConn = nullptr; // Safety: Prevent any late callbacks from using it
     }
 }
 
@@ -234,7 +238,6 @@ void NetworkMonitor::SetGlobalState(int state) {
 
 void NetworkMonitor::RefreshActiveDevice() {
     if (!m_dbusConn) return;
-    QVariantMap newDevice;
 
     GVariant *vPrimary = g_dbus_connection_call_sync(m_dbusConn,
         "org.freedesktop.NetworkManager", "/org/freedesktop/NetworkManager",
@@ -248,6 +251,15 @@ void NetworkMonitor::RefreshActiveDevice() {
     g_variant_get(vPrimary, "(v)", &vInnerPath);
     const gchar *activeConnPath = g_variant_get_string(vInnerPath, nullptr);
 
+    // FIX: Check if the connection path is actually different from what we already have
+    // before doing all the extra work.
+    if (m_activeDevice["_nm_connection_path"].toString() == QString::fromUtf8(activeConnPath)) {
+        g_variant_unref(vInnerPath);
+        g_variant_unref(vPrimary);
+        return; 
+    }
+
+    QVariantMap newDevice;
     if (g_strcmp0(activeConnPath, "/") != 0) {
         GVariant *vDevices = g_dbus_connection_call_sync(m_dbusConn,
             "org.freedesktop.NetworkManager", activeConnPath,
@@ -302,6 +314,8 @@ void NetworkMonitor::RefreshActiveDevice() {
         m_activeDevice = newDevice;
         emit activeDeviceChanged();
     }
+
+    newDevice["_nm_connection_path"] = QString::fromUtf8(activeConnPath);
 }
 
 void NetworkMonitor::RefreshActiveAccessPoint(const QString &devicePath) {

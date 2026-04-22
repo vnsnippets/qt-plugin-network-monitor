@@ -23,9 +23,8 @@ class NetworkMonitor : public QObject {
 
         void SetConnectivityState(int state);
         void SetGlobalState(int state);
-        void RefreshActiveDevice();
-
         void SetActiveAccessPoint(const QVariantMap &ap);
+        Q_INVOKABLE void RefreshActiveDevice();
 
     signals:
         void activeDeviceChanged();
