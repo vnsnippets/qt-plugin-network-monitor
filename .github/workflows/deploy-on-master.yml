@@ -3,13 +3,12 @@ name: Build and Release Plugin
 on:
   release:
     types: [created]
-
   workflow_dispatch:
-      inputs:
-        version:
-          description: 'Version to build (e.g., 0.1.0)'
-          required: true
-          default: '0.1.0'
+    inputs:
+      version:
+        description: 'Version to build (e.g., 0.1.0)'
+        required: true
+        default: '0.1.0'
 
 jobs:
   build-and-deploy:
@@ -18,7 +17,7 @@ jobs:
       contents: write
 
     steps:
-      - name: Checkout Code
+      - name: 📥 Checkout Code
         uses: actions/checkout@v4
 
       - name: 🛠️ Install System Dependencies
@@ -27,40 +26,54 @@ jobs:
           sudo apt-get install -y \
             build-essential \
             cmake \
-            qt6-base-dev \
-            qt6-declarative-dev \
+            pkg-config \
             libglib2.0-dev \
-            libgio2.0-cil-dev \
-            pkg-config
+            libgio2.0-dev \
+            qt6-base-dev \
+            qt6-declarative-dev
 
-      - name: Configure CMake
+      - name: 🏷️ Determine Version
+        id: get_version
+        shell: bash
         run: |
-          CLEAN_VERSION=${{ github.event.release.tag_name }}
-          CLEAN_VERSION=${CLEAN_VERSION#v}
-          
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            VERSION="${{ github.event.inputs.version }}"
+          else
+            VERSION="${{ github.event.release.tag_name }}"
+          fi
+          # Strip 'v' prefix
+          CLEAN_VERSION=${VERSION#v}
+          echo "version=$CLEAN_VERSION" >> $GITHUB_OUTPUT
           echo "Building version: $CLEAN_VERSION"
-          
-          # Configure build with version injection
+
+      - name: ⚙️ Configure CMake
+        run: |
           cmake -B build \
             -DCMAKE_BUILD_TYPE=Release \
-            -DBUILD_VERSION=$CLEAN_VERSION
+            -DBUILD_VERSION=${{ steps.get_version.outputs.version }}
 
-      - name: Build Plugin
+      - name: 🏗️ Build Plugin
         run: cmake --build build --config Release
 
-      - name: Package Artifacts
+      - name: 📦 Package Artifacts
         run: |
           cd build
-          # We pack the .so and the auto-generated qmldir
-          # Using -C . ensures files are in the root of the archive
-          tar -cvzf ../NetworkMonitorDBusPlugin.tar.gz libNetworkMonitorDBusPlugin.so qmldir
+          # We use wildcard to catch the .so in case prefix/suffix varies
+          tar -cvzf ../NetworkMonitorDBusPlugin.tar.gz *NetworkMonitorDBusPlugin.so qmldir
           cd ..
 
-      - name: Upload to GitHub Release
+      - name: 🚀 Upload to GitHub Release
+        if: github.event_name == 'release'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          # Use the official GitHub CLI to attach the binary to the release
           gh release upload ${{ github.event.release.tag_name }} \
             NetworkMonitorDBusPlugin.tar.gz \
             --clobber
+
+      - name: 📂 Upload Workflow Artifact
+        if: github.event_name == 'workflow_dispatch'
+        uses: actions/upload-artifact@v4
+        with:
+          name: NetworkMonitorDBusPlugin-${{ steps.get_version.outputs.version }}
+          path: NetworkMonitorDBusPlugin.tar.gz
