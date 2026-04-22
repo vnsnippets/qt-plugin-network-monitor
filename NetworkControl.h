@@ -29,5 +29,5 @@ class NetworkControl : public QObject {
         Q_INVOKABLE void ActivateConnection(const QString &devicePath, const QString &settingsPath, const QString &accessPointPath);
         Q_INVOKABLE void DisconnectDevice(const QString &devicePath);
     private:
-        GDBusConnection *m_conn = nullptr;
+        GDBusConnection *m_dbusConn = nullptr;
 };

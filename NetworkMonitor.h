@@ -2,6 +2,8 @@
 #include <QObject>
 #include <QVariantMap>
 
+typedef struct _GDBusConnection GDBusConnection;
+
 class NetworkMonitor : public QObject {
     Q_OBJECT
     Q_PROPERTY(int ConnectivityState READ connectivityState NOTIFY connectivityStateChanged)
@@ -12,6 +14,7 @@ class NetworkMonitor : public QObject {
 
     public:
         explicit NetworkMonitor(QObject *parent = nullptr);
+        ~NetworkMonitor();
 
         int connectivityState() const { return m_connectivityState; }
         int globalState() const { return m_globalState; }
@@ -39,10 +42,19 @@ class NetworkMonitor : public QObject {
         // void connectionRemoved(const QString &path);
 
     private:
+        // Store IDs for every subscription
+        unsigned int m_stateSubId = 0;
+        unsigned int m_propsSubId = 0;
+        unsigned int m_deviceAddedSubId = 0;
+        unsigned int m_deviceRemovedSubId = 0;
+        unsigned int m_wirelessPropsSubId = 0;
+        unsigned int m_deviceStateSubId = 0;
+        unsigned int m_apSubscriptionId = 0; 
+
+        GDBusConnection *m_dbusConn = nullptr;
         int m_connectivityState = 0;
         int m_globalState = 0;
         QVariantMap m_activeDevice;
-        unsigned int m_apSubscriptionId = 0; 
         QVariantMap m_activeAccessPoint;
         void SubscribeToAccessPointStrength(const QString &apPath);
         void RefreshActiveAccessPoint(const QString &devicePath);

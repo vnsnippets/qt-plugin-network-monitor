@@ -18,6 +18,7 @@ pkg_check_modules(GLIB REQUIRED glib-2.0 gio-2.0)
 add_library(NetworkMonitorDBusPlugin SHARED
     NetworkMonitor.cpp
     NetworkControl.cpp
+    DBusFactory.cpp
     Utilities.cpp
     plugin.cpp
 )

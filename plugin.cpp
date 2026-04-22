@@ -14,35 +14,47 @@
 #include <QtQml/qqml.h> 
 #include "NetworkMonitor.h"
 #include "NetworkControl.h"
+#include "DBusFactory.h"
+
+static NetworkControl* s_control = nullptr;
+static NetworkMonitor* s_monitor = nullptr;
 
 static QObject* network_control_singleton_provider(QQmlEngine *engine, QJSEngine *scriptEngine) {
-    Q_UNUSED(engine)
-    Q_UNUSED(scriptEngine)
-    
-    // The engine takes ownership of this object
-    return new NetworkControl();
+    if (!s_control) {
+        s_control = new NetworkControl();
+    }
+    return s_control;
 }
 
 static QObject* network_monitor_singleton_provider(QQmlEngine *engine, QJSEngine *scriptEngine) {
-    Q_UNUSED(engine)
-    Q_UNUSED(scriptEngine)
-    
-    // The engine takes ownership of this object
-    return new NetworkMonitor();
+    if (!s_monitor) {
+        s_monitor = new NetworkMonitor();
+    }
+    return s_monitor;
 }
 
 class NetworkMonitorDBusPlugin : public QQmlExtensionPlugin {
     Q_OBJECT
     Q_PLUGIN_METADATA(IID QQmlExtensionInterface_iid)
 
-public:
-    void registerTypes(const char *uri) override {
-        // 1. Register NetworkMonitor as a Singleton
-        qmlRegisterSingletonType<NetworkMonitor>(uri, 1, 0, "NetworkMonitor", network_monitor_singleton_provider);
+    public:
+        void registerTypes(const char *uri) override {
+            qmlRegisterSingletonType<NetworkMonitor>(uri, 1, 0, "NetworkMonitor", network_monitor_singleton_provider);
+            qmlRegisterSingletonType<NetworkControl>(uri, 1, 0, "NetworkControl", network_control_singleton_provider);
+        }
 
-        // 2. Register NetworkControl as a Singleton
-        qmlRegisterSingletonType<NetworkControl>(uri, 1, 0, "NetworkControl", network_control_singleton_provider);
-    }
+        // This is called when the plugin is actually unloaded or the app shuts down
+        ~NetworkMonitorDBusPlugin() {
+            if (s_monitor) {
+                delete s_monitor;
+                s_monitor = nullptr;
+            }
+            if (s_control) {
+                delete s_control;
+                s_control = nullptr;
+            }
+            DBusFactory::cleanup();
+        }
 };
 
 #include "plugin.moc"
