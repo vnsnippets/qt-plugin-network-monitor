@@ -1,0 +1,66 @@
+name: Build and Release Plugin
+
+on:
+  release:
+    types: [created]
+
+  workflow_dispatch:
+      inputs:
+        version:
+          description: 'Version to build (e.g., 0.1.0)'
+          required: true
+          default: '0.1.0'
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: 🛠️ Install System Dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            build-essential \
+            cmake \
+            qt6-base-dev \
+            qt6-declarative-dev \
+            libglib2.0-dev \
+            libgio2.0-cil-dev \
+            pkg-config
+
+      - name: Configure CMake
+        run: |
+          CLEAN_VERSION=${{ github.event.release.tag_name }}
+          CLEAN_VERSION=${CLEAN_VERSION#v}
+          
+          echo "Building version: $CLEAN_VERSION"
+          
+          # Configure build with version injection
+          cmake -B build \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DBUILD_VERSION=$CLEAN_VERSION
+
+      - name: Build Plugin
+        run: cmake --build build --config Release
+
+      - name: Package Artifacts
+        run: |
+          cd build
+          # We pack the .so and the auto-generated qmldir
+          # Using -C . ensures files are in the root of the archive
+          tar -cvzf ../NetworkMonitorDBusPlugin.tar.gz libNetworkMonitorDBusPlugin.so qmldir
+          cd ..
+
+      - name: Upload to GitHub Release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # Use the official GitHub CLI to attach the binary to the release
+          gh release upload ${{ github.event.release.tag_name }} \
+            NetworkMonitorDBusPlugin.tar.gz \
+            --clobber
