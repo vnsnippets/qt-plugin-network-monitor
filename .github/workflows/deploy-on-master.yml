@@ -6,9 +6,12 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: 'Version to build (e.g., 0.1.0)'
+        description: 'Version (e.g., 0.1.0)'
         required: true
         default: '0.1.0'
+
+env:
+  PLUGIN_NAME: NetworkMonitorPlugin
 
 jobs:
   build-and-deploy:
@@ -46,33 +49,26 @@ jobs:
           echo "Building version: $CLEAN_VERSION"
 
       - name: ⚙️ Configure CMake
-        # Pointing CMake to the ./code directory as the source root
-        run: |
-          cmake -S code -B build \
-            -DCMAKE_BUILD_TYPE=Release \
-            -DBUILD_VERSION=${{ steps.get_version.outputs.version }}
+        run: cmake -S ./code -B ./build/${PLUGIN_NAME} -DCMAKE_BUILD_TYPE=Release -DBUILD_VERSION=${{ steps.get_version.outputs.version }}
 
       - name: 🏗️ Build Plugin
-        run: cmake --build build --config Release
+        run: cmake --build ./build/${PLUGIN_NAME} --config Release
 
       - name: 📦 Package Artifacts
         run: |
-          cd build
-          tar -cvzf ../NetworkMonitorDBusPlugin.tar.gz *NetworkMonitorDBusPlugin.so qmldir
+          cd build/${PLUGIN_NAME}
+          tar -cvzf ../${PLUGIN_NAME}.tar.gz *
           cd ..
 
       - name: 🚀 Upload to GitHub Release
         if: github.event_name == 'release'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          gh release upload ${{ steps.get_version.outputs.tag }} \
-            NetworkMonitorDBusPlugin.tar.gz \
-            --clobber
+        run: gh release upload ${{ steps.get_version.outputs.tag }} ${PLUGIN_NAME}.tar.gz --clobber
 
       - name: 📂 Upload Workflow Artifact
         if: github.event_name == 'workflow_dispatch'
         uses: actions/upload-artifact@v4
         with:
-          name: NetworkMonitorDBusPlugin-${{ steps.get_version.outputs.version }}
-          path: NetworkMonitorDBusPlugin.tar.gz
+          name: ${PLUGIN_NAME}-${{ steps.get_version.outputs.version }}
+          path: ${PLUGIN_NAME}.tar.gz

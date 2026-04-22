@@ -3,6 +3,7 @@
 #include <QStringList>
 #include <QVariantMap>
 #include <QList>
+#include <QtQml/qqmlregistration.h>
 
 struct DeviceInfo {
     QString path;
@@ -13,7 +14,7 @@ struct DeviceInfo {
 typedef struct _GDBusConnection GDBusConnection;
 
 class NetworkControl : public QObject {
-    Q_OBJECT
+    Q_OBJECT QML_ELEMENT QML_SINGLETON
     Q_DISABLE_COPY(NetworkControl) // Standard for singletons
 
     public:

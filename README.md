@@ -22,6 +22,33 @@ A Quickshell/QML plugin that talks directly to **NetworkManager** over **DBus** 
 
 ---
 
+### Installation
+
+Visit the [Releases]() page to find the latest packages.
+- Download the latest release in `tar.gz` format
+- Extract it to your Quickshell plugins folder
+
+**Where is the plugins folder?**
+
+> I don't know, you tell me. 
+
+No seriously, it must be set in your environment variables. So it's up to you.
+
+Example:
+```bash
+# Quickshell Environment Variable as follows:
+QML_IMPORT_PATH = "/home/<user>/.config/quickshell/plugins"
+
+# Extracted files must be in a NetworkMonitorPlugin folder
+# Quickshell/QML allows import based on folder path:
+/home/<user>/.config/quickshell
+ └── plugins
+     └── NetworkMonitorPlugin
+          └──(Extracted content)
+``` 
+
+---
+
 ### API Reference
 
 Network Monitor (Singleton) `NetworkMonitor`

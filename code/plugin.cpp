@@ -23,44 +23,18 @@
 #include "NetworkControl.h"
 #include "DBusFactory.h"
 
-static NetworkControl* s_control = nullptr;
-static NetworkMonitor* s_monitor = nullptr;
-
-static QObject* network_control_singleton_provider(QQmlEngine *engine, QJSEngine *scriptEngine) {
-    if (!s_control) {
-        s_control = new NetworkControl();
-    }
-    return s_control;
-}
-
-static QObject* network_monitor_singleton_provider(QQmlEngine *engine, QJSEngine *scriptEngine) {
-    if (!s_monitor) {
-        s_monitor = new NetworkMonitor();
-    }
-    return s_monitor;
-}
-
-class NetworkMonitorDBusPlugin : public QQmlExtensionPlugin {
+class NetworkMonitorPlugin : public QQmlExtensionPlugin {
     Q_OBJECT
     Q_PLUGIN_METADATA(IID QQmlExtensionInterface_iid)
 
     public:
         void registerTypes(const char *uri) override {
-            qmlRegisterSingletonType<NetworkMonitor>(uri, 1, 0, "NetworkMonitor", network_monitor_singleton_provider);
-            qmlRegisterSingletonType<NetworkControl>(uri, 1, 0, "NetworkControl", network_control_singleton_provider);
+            qmlRegisterType<NetworkMonitor>(uri, 1, 0, "NetworkMonitor");
+            qmlRegisterType<NetworkControl>(uri, 1, 0, "NetworkControl");
         }
 
-        // This is called when the plugin is actually unloaded or the app shuts down
-        ~NetworkMonitorDBusPlugin() {
-            if (s_monitor) {
-                delete s_monitor;
-                s_monitor = nullptr;
-            }
-            if (s_control) {
-                delete s_control;
-                s_control = nullptr;
-            }
-            DBusFactory::cleanup();
+        ~NetworkMonitorPlugin() {
+            DBusFactory::cleanup();  // Clean up shared DBus resources
         }
 };
 

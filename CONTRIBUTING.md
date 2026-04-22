@@ -1,4 +1,4 @@
-### Contributing to NetworkMonitorDBusPlugin
+### Contributing to NetworkMonitorPlugin
 
 Thanks for taking the time to contribute!
 Whether you are fixing a bug, improving the documentation, or adding support for a new feature, your help is appreciated. Even just raising issues helps to be honest.

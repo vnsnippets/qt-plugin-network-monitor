@@ -1,11 +1,12 @@
 #pragma once
 #include <QObject>
 #include <QVariantMap>
+#include <QtQml/qqmlregistration.h>
 
 typedef struct _GDBusConnection GDBusConnection;
 
 class NetworkMonitor : public QObject {
-    Q_OBJECT
+    Q_OBJECT QML_ELEMENT QML_SINGLETON
     Q_PROPERTY(int ConnectivityState READ connectivityState NOTIFY connectivityStateChanged)
     Q_PROPERTY(int GlobalState READ globalState NOTIFY globalStateChanged)
     Q_PROPERTY(QVariantMap ActiveDevice READ activeDevice NOTIFY activeDeviceChanged)
@@ -55,6 +56,10 @@ class NetworkMonitor : public QObject {
         int m_globalState = 0;
         QVariantMap m_activeDevice;
         QVariantMap m_activeAccessPoint;
+        
+        /// Instance member to track last subscribed AP path (replaces static variable for thread safety)
+        QString m_lastSubscribedApPath;
+        
         void SubscribeToAccessPointStrength(const QString &apPath);
         void RefreshActiveAccessPoint(const QString &devicePath);
 };
