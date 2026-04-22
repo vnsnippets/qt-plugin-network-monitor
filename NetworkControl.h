@@ -22,6 +22,7 @@ class NetworkControl : public QObject {
         Q_INVOKABLE QVariantMap GetSettings(const QString &settingsPath);
         Q_INVOKABLE void RequestScan(const QString &devicePath);
         Q_INVOKABLE QList<QVariantMap> GetAccessPoints(const QString &devicePath);
+        Q_INVOKABLE QList<QVariantMap> GetKnownNetworksInRange();
         Q_INVOKABLE void ActivateConnection(
             const QString &devicePath,
             const QString &connectionPath,
