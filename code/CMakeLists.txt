@@ -36,6 +36,11 @@ qt_add_qml_module(NetworkMonitorPlugin
         plugin.cpp
 )
 
+set_target_properties(NetworkMonitorPlugin PROPERTIES
+    INSTALL_RPATH "$ORIGIN"
+    BUILD_WITH_INSTALL_RPATH TRUE
+)
+
 # 4. Include directories
 target_include_directories(NetworkMonitorPlugin PRIVATE 
     ${GLIB_INCLUDE_DIRS}

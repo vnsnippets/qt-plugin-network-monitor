@@ -57,7 +57,7 @@ jobs:
       - name: 📦 Package Artifacts
         run: |
           cd build/${PLUGIN_NAME}
-          tar -cvzf ../${PLUGIN_NAME}.tar.gz *
+          tar -cvzf ../${PLUGIN_NAME}.tar.gz *.so qmldir
           cd ..
 
       - name: 🚀 Upload to GitHub Release
