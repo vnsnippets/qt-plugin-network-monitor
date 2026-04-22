@@ -42,6 +42,12 @@ QVariant gvariantToQVariant(GVariant *variant) {
         return QString::fromUtf8(g_variant_get_string(variant, nullptr));
     }
 
+    // Byte
+    if (g_variant_is_of_type(variant, G_VARIANT_TYPE_BYTE)) {
+        guchar byteVal = g_variant_get_byte(variant);
+        return static_cast<int>(byteVal);
+    }
+
     // Byte Arrays (ay): QML cannot read QByteArray directly as a string.
     // Convert to a Hex string or UTF-8 QString so the UI can see it.
     if (g_variant_is_of_type(variant, G_VARIANT_TYPE("ay"))) {
@@ -66,62 +72,3 @@ QVariant gvariantToQVariant(GVariant *variant) {
 
     return QVariant(); 
 }
-
-// QVariant gvariantToQVariant(GVariant *variant) {
-//     if (!variant) return QVariant();
-    
-//     GVariant *val = nullptr;
-//     if (g_variant_is_of_type(variant, G_VARIANT_TYPE_VARIANT)) {
-//         val = g_variant_get_variant(variant);
-//     } else {
-//         val = g_variant_ref(variant);
-//     }
-
-//     QVariant result;
-//     if (g_variant_is_of_type(val, G_VARIANT_TYPE_STRING)) {
-//         result = QString::fromUtf8(g_variant_get_string(val, nullptr));
-//     } else if (g_variant_is_of_type(val, G_VARIANT_TYPE_UINT32)) {
-//         result = static_cast<quint32>(g_variant_get_uint32(val));
-//     } else if (g_variant_is_of_type(val, G_VARIANT_TYPE_INT32)) {
-//         result = static_cast<qint32>(g_variant_get_int32(val));
-//     } else if (g_variant_is_of_type(val, G_VARIANT_TYPE_UINT64)) {
-//         result = static_cast<quint64>(g_variant_get_uint64(val));
-//     } else if (g_variant_is_of_type(val, G_VARIANT_TYPE_INT64)) {
-//         result = static_cast<qint64>(g_variant_get_int64(val));
-//     } else if (g_variant_is_of_type(val, G_VARIANT_TYPE_DOUBLE)) {
-//         result = g_variant_get_double(val);
-//     } else if (g_variant_is_of_type(val, G_VARIANT_TYPE_BOOLEAN)) {
-//         result = g_variant_get_boolean(val);
-//     } else if (g_variant_is_of_type(val, G_VARIANT_TYPE_BYTE)) {
-//         guchar byteVal = g_variant_get_byte(val);
-//         result = static_cast<int>(byteVal);
-//     } else if (g_variant_is_of_type(val, G_VARIANT_TYPE("ay"))) {
-//         // BYTE ARRAY
-//         const gchar *ayVal;
-//         gsize len;
-//         ayVal = (const gchar *)g_variant_get_fixed_array(val, &len, 1);
-//         result = QString::fromUtf8(ayVal, static_cast<int>(len));
-//     } else if (g_variant_is_of_type(val, G_VARIANT_TYPE("as"))) {
-//         // ARRAY OF STRINGS
-//         QStringList list;
-//         GVariantIter iter;
-//         const gchar *str;
-//         g_variant_iter_init(&iter, val);
-//         while (g_variant_iter_loop(&iter, "s", &str)) {
-//             list << QString::fromUtf8(str);
-//         }
-//         result = list;
-//     } else if (g_variant_is_of_type(val, G_VARIANT_TYPE_OBJECT_PATH)) {
-//         result = QString::fromUtf8(g_variant_get_string(val, nullptr));
-//     } else if (g_variant_is_of_type(val, G_VARIANT_TYPE_SIGNATURE)) {
-//         result = QString::fromUtf8(g_variant_get_string(val, nullptr));
-//     } else {
-//         // Fallback: print as string
-//         gchar *printed = g_variant_print(val, FALSE);
-//         result = QString::fromUtf8(printed);
-//         g_free(printed);
-//     }
-
-//     g_variant_unref(val);
-//     return result;
-// }

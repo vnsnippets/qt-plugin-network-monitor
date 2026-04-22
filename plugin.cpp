@@ -15,14 +15,33 @@
 #include "NetworkMonitor.h"
 #include "NetworkControl.h"
 
+static QObject* network_control_singleton_provider(QQmlEngine *engine, QJSEngine *scriptEngine) {
+    Q_UNUSED(engine)
+    Q_UNUSED(scriptEngine)
+    
+    // The engine takes ownership of this object
+    return new NetworkControl();
+}
+
+static QObject* network_monitor_singleton_provider(QQmlEngine *engine, QJSEngine *scriptEngine) {
+    Q_UNUSED(engine)
+    Q_UNUSED(scriptEngine)
+    
+    // The engine takes ownership of this object
+    return new NetworkMonitor();
+}
+
 class NetworkMonitorDBusPlugin : public QQmlExtensionPlugin {
     Q_OBJECT
     Q_PLUGIN_METADATA(IID QQmlExtensionInterface_iid)
 
 public:
     void registerTypes(const char *uri) override {
-        qmlRegisterType<NetworkMonitor>(uri, 1, 0, "NetworkMonitor");
-        qmlRegisterType<NetworkControl>(uri, 1, 0, "NetworkControl");
+        // 1. Register NetworkMonitor as a Singleton
+        qmlRegisterSingletonType<NetworkMonitor>(uri, 1, 0, "NetworkMonitor", network_monitor_singleton_provider);
+
+        // 2. Register NetworkControl as a Singleton
+        qmlRegisterSingletonType<NetworkControl>(uri, 1, 0, "NetworkControl", network_control_singleton_provider);
     }
 };
 

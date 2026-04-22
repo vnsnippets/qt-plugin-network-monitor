@@ -14,6 +14,8 @@ typedef struct _GDBusConnection GDBusConnection;
 
 class NetworkControl : public QObject {
     Q_OBJECT
+    Q_DISABLE_COPY(NetworkControl) // Standard for singletons
+
     public:
         explicit NetworkControl(QObject *parent = nullptr);
         ~NetworkControl();
@@ -24,7 +26,7 @@ class NetworkControl : public QObject {
         Q_INVOKABLE void RequestScan(const QString &devicePath);
         Q_INVOKABLE QList<QVariantMap> GetAccessPoints(const QString &devicePath);
         Q_INVOKABLE QList<QVariantMap> GetKnownNetworksInRange(const QString &devicePath);
-        Q_INVOKABLE void ActivateConnection(const QString &devicePath, const QString &connectionPath, const QString &specificObjectPath);
+        Q_INVOKABLE void ActivateConnection(const QString &devicePath, const QString &settingsPath, const QString &accessPointPath);
         Q_INVOKABLE void DisconnectDevice(const QString &devicePath);
     private:
         GDBusConnection *m_conn = nullptr;

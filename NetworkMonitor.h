@@ -7,6 +7,7 @@ class NetworkMonitor : public QObject {
     Q_PROPERTY(int connectivityState READ connectivityState NOTIFY connectivityStateChanged)
     Q_PROPERTY(int globalState READ globalState NOTIFY globalStateChanged)
     Q_PROPERTY(QVariantMap activeDevice READ activeDevice NOTIFY activeDeviceChanged)
+    Q_DISABLE_COPY(NetworkMonitor) // Standard for singletons
 
     public:
         explicit NetworkMonitor(QObject *parent = nullptr);

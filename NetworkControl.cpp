@@ -1,5 +1,6 @@
 #include "NetworkControl.h"
 #include "Utilities.h"
+#include <QDateTime>
 #include <QDebug>
 
 #undef signals
@@ -292,49 +293,65 @@ QList<QVariantMap> NetworkControl::GetAccessPoints(const QString &devicePath) {
 
 QList<QVariantMap> NetworkControl::GetKnownNetworksInRange(const QString &wifiDevicePath) {
     QList<QVariantMap> result;
-    if (!m_conn) return result;
+    if (!m_conn || wifiDevicePath.isEmpty()) return result;
 
-    GError *error = nullptr;
-
-    if (wifiDevicePath.isEmpty()) return result;
-
-    // --- Step 2: Map SSIDs to Settings Paths ---
+    // --- Step 1: Map SSIDs to Settings Paths AND Timestamps ---
     QMap<QString, QString> savedSsids;
-    GVariant *availRes = g_dbus_connection_call_sync(m_conn, "org.freedesktop.NetworkManager", wifiDevicePath.toUtf8().constData(),
-        "org.freedesktop.DBus.Properties", "Get", g_variant_new("(ss)", "org.freedesktop.NetworkManager.Device", "AvailableConnections"), 
+    QMap<QString, quint64> savedTimestamps; // Store the 'timestamp' property
+
+    GVariant *availRes = g_dbus_connection_call_sync(m_conn, "org.freedesktop.NetworkManager", 
+        wifiDevicePath.toUtf8().constData(), "org.freedesktop.DBus.Properties", "Get", 
+        g_variant_new("(ss)", "org.freedesktop.NetworkManager.Device", "AvailableConnections"), 
         G_VARIANT_TYPE("(v)"), G_DBUS_CALL_FLAGS_NONE, -1, nullptr, nullptr);
 
     if (availRes) {
         GVariant *vList; 
-        g_variant_get(availRes, "(v)", &vList); // vList is now the 'ao' (array of object paths)
-        
+        g_variant_get(availRes, "(v)", &vList);
         GVariantIter iter; 
         g_variant_iter_init(&iter, vList);
-        const gchar *satePath;
+        const gchar *statePath;
         
-        while (g_variant_iter_loop(&iter, "o", &satePath)) {
-            GVariant *sSettingsRes = g_dbus_connection_call_sync(m_conn, "org.freedesktop.NetworkManager", satePath, 
-                "org.freedesktop.NetworkManager.Settings.Connection", "GetSettings", nullptr, G_VARIANT_TYPE("(a{sa{sv}})"), G_DBUS_CALL_FLAGS_NONE, -1, nullptr, nullptr);
+        while (g_variant_iter_loop(&iter, "o", &statePath)) {
+            GVariant *sSettingsRes = g_dbus_connection_call_sync(m_conn, "org.freedesktop.NetworkManager", statePath, 
+                "org.freedesktop.NetworkManager.Settings.Connection", "GetSettings", nullptr, 
+                G_VARIANT_TYPE("(a{sa{sv}})"), G_DBUS_CALL_FLAGS_NONE, -1, nullptr, nullptr);
             
             if (sSettingsRes) {
                 GVariant *sDict;
-                // CRITICAL FIX: Extract the dictionary from the return tuple '(a{sa{sv}})'
                 g_variant_get(sSettingsRes, "(@a{sa{sv}})", &sDict); 
 
-                // Now sDict is a valid dictionary ('a{sa{sv}}') for lookup
+                QString currentSsidName;
+                quint64 lastTimestamp = 0;
+
+                // A. Get SSID from '802-11-wireless'
                 GVariant *wireless = g_variant_lookup_value(sDict, "802-11-wireless", G_VARIANT_TYPE("a{sv}"));
                 if (wireless) {
                     GVariant *vSsid = g_variant_lookup_value(wireless, "ssid", G_VARIANT_TYPE("ay"));
                     if (vSsid) {
                         gsize len;
                         const guint8 *bytes = (const guint8*)g_variant_get_fixed_array(vSsid, &len, 1);
-                        if (bytes) {
-                            savedSsids[QString::fromUtf8((const char*)bytes, len)] = QString::fromUtf8(satePath);
-                        }
+                        currentSsidName = QString::fromUtf8((const char*)bytes, len);
                         g_variant_unref(vSsid);
                     }
                     g_variant_unref(wireless);
                 }
+
+                // B. Get Timestamp from 'connection'
+                GVariant *connection = g_variant_lookup_value(sDict, "connection", G_VARIANT_TYPE("a{sv}"));
+                if (connection) {
+                    GVariant *vTime = g_variant_lookup_value(connection, "timestamp", G_VARIANT_TYPE("t"));
+                    if (vTime) {
+                        lastTimestamp = g_variant_get_uint64(vTime);
+                        g_variant_unref(vTime);
+                    }
+                    g_variant_unref(connection);
+                }
+
+                if (!currentSsidName.isEmpty()) {
+                    savedSsids[currentSsidName] = QString::fromUtf8(statePath);
+                    savedTimestamps[currentSsidName] = lastTimestamp;
+                }
+
                 g_variant_unref(sDict);
                 g_variant_unref(sSettingsRes);
             }
@@ -343,18 +360,25 @@ QList<QVariantMap> NetworkControl::GetKnownNetworksInRange(const QString &wifiDe
         g_variant_unref(availRes);
     }
 
-    // --- Step 3: Get Access Points ---
-    GVariant *apRes = g_dbus_connection_call_sync(m_conn, "org.freedesktop.NetworkManager", wifiDevicePath.toUtf8().constData(),
-        "org.freedesktop.NetworkManager.Device.Wireless", "GetAccessPoints", nullptr, G_VARIANT_TYPE("(ao)"), G_DBUS_CALL_FLAGS_NONE, -1, nullptr, nullptr);
+    // --- Step 2: Get Access Points ---
+    GVariant *apRes = g_dbus_connection_call_sync(m_conn, "org.freedesktop.NetworkManager", 
+        wifiDevicePath.toUtf8().constData(), "org.freedesktop.NetworkManager.Device.Wireless", 
+        "GetAccessPoints", nullptr, G_VARIANT_TYPE("(ao)"), G_DBUS_CALL_FLAGS_NONE, -1, nullptr, nullptr);
 
     if (apRes) {
         GVariantIter *apIter;
         const gchar *apPath;
         g_variant_get(apRes, "(ao)", &apIter);
         while (g_variant_iter_loop(apIter, "o", &apPath)) {
-            GVariant *props = g_dbus_connection_call_sync(m_conn, "org.freedesktop.NetworkManager", apPath, "org.freedesktop.DBus.Properties", 
-                "GetAll", g_variant_new("(s)", "org.freedesktop.NetworkManager.AccessPoint"), G_VARIANT_TYPE("(a{sv})"), G_DBUS_CALL_FLAGS_NONE, -1, nullptr, nullptr);
-            
+            GVariant *props = g_dbus_connection_call_sync(m_conn, 
+                "org.freedesktop.NetworkManager", 
+                apPath, 
+                "org.freedesktop.DBus.Properties", 
+                "GetAll", 
+                g_variant_new("(s)", "org.freedesktop.NetworkManager.AccessPoint"),
+                G_VARIANT_TYPE("(a{sv})"), 
+                G_DBUS_CALL_FLAGS_NONE, -1, nullptr, nullptr);
+
             if (props) {
                 QVariantMap apMap;
                 GVariantIter *pIter;
@@ -362,28 +386,37 @@ QList<QVariantMap> NetworkControl::GetKnownNetworksInRange(const QString &wifiDe
                 
                 const gchar *pKey;
                 GVariant *pVal;
-                QString currentSsid; 
-
-                // 1. Collect ALL standard D-Bus properties
+                QString currentSsid;
+                
                 while (g_variant_iter_next(pIter, "{sv}", &pKey, &pVal)) {
+                    // DEBUG: Uncomment this to see every key NM sends for an AP
+                    // qDebug() << "AP Property Key:" << pKey;
+
                     QVariant qv = gvariantToQVariant(pVal);
                     apMap[QString::fromUtf8(pKey)] = qv;
-                    
-                    // Capture SSID for the "Saved" check
+                  
                     if (g_strcmp0(pKey, "Ssid") == 0) {
                         currentSsid = qv.toString();
                     }
+                    
                     g_variant_unref(pVal);
                 }
 
-                // 2. Add extra metadata fields on top
                 apMap["AccessPointPath"] = QString::fromUtf8(apPath);
+                
+                // Add Saved & LastConnected metadata
                 if (!currentSsid.isEmpty() && savedSsids.contains(currentSsid)) {
                     apMap["Saved"] = true;
                     apMap["SettingsPath"] = savedSsids[currentSsid];
+                    
+                    // Logic for LastConnected: NM returns 0 if never connected
+                    // We return the raw quint64 to QML
+                    quint64 ts = savedTimestamps[currentSsid];
+                    apMap["LastConnected"] = ts; 
                 } else {
                     apMap["Saved"] = false;
                     apMap["SettingsPath"] = ""; 
+                    apMap["LastConnected"] = 0;
                 }
 
                 result.append(apMap);
@@ -398,7 +431,18 @@ QList<QVariantMap> NetworkControl::GetKnownNetworksInRange(const QString &wifiDe
     return result;
 }
 
-void NetworkControl::ActivateConnection(const QString &devicePath, const QString &connectionPath, const QString &specificObjectPath) {
+/**
+ * Only works for known networks
+ * For new networks, use AddAndActivateConnection
+ * (If I ever got to adding that method)
+ */
+void NetworkControl::ActivateConnection(const QString &devicePath, const QString &settingsPath, const QString &accessPointPath) {
+    // If any of these are empty, GDBus will throw a Critical Assertion
+    if (devicePath.isEmpty() || settingsPath.isEmpty() || accessPointPath.isEmpty()) {
+        qWarning() << "ActivateConnection aborted: Missing object paths.";
+        return;
+    }
+    
     GError *error = nullptr;
 
     g_dbus_connection_call_sync(m_conn,
@@ -406,12 +450,13 @@ void NetworkControl::ActivateConnection(const QString &devicePath, const QString
         "/org/freedesktop/NetworkManager",
         "org.freedesktop.NetworkManager",
         "ActivateConnection",
-        g_variant_new("(ooo)", NULL,
-            connectionPath.toUtf8().constData(),
+        // The signature is (ooo): Connection, Device, SpecificObject
+        g_variant_new("(ooo)", 
+            settingsPath.toUtf8().constData(),
             devicePath.toUtf8().constData(),
-            specificObjectPath.toUtf8().constData()
+            accessPointPath.toUtf8().constData()
         ),
-        NULL,
+        G_VARIANT_TYPE("(o)"), // This returns the path of the ActiveConnection object
         G_DBUS_CALL_FLAGS_NONE,
         -1,
         nullptr,
