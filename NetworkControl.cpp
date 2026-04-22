@@ -25,6 +25,80 @@ NetworkControl::~NetworkControl() {
     }
 }
 
+QVariantMap NetworkControl::GetActiveDevice() {
+    QVariantMap details;
+    if (!m_conn) return details;
+
+    GError *error = nullptr;
+
+    // 1. Get all device paths
+    GVariant *result = g_dbus_connection_call_sync(m_conn,
+        "org.freedesktop.NetworkManager", "/org/freedesktop/NetworkManager",
+        "org.freedesktop.NetworkManager", "GetDevices",
+        nullptr, G_VARIANT_TYPE("(ao)"), G_DBUS_CALL_FLAGS_NONE, -1, nullptr, &error);
+
+    if (!result) {
+        if (error) { qWarning() << "GetDevices failed:" << error->message; g_error_free(error); }
+        return details;
+    }
+
+    GVariantIter *iter;
+    const gchar *path;
+    g_variant_get(result, "(ao)", &iter);
+
+    while (g_variant_iter_loop(iter, "o", &path)) {
+        // 2. Check if this specific device is active (State 100)
+        GVariant *vState = g_dbus_connection_call_sync(m_conn,
+            "org.freedesktop.NetworkManager", path, "org.freedesktop.DBus.Properties",
+            "Get", g_variant_new("(ss)", "org.freedesktop.NetworkManager.Device", "State"),
+            G_VARIANT_TYPE("(v)"), G_DBUS_CALL_FLAGS_NONE, -1, nullptr, nullptr);
+
+        if (vState) {
+            GVariant *inner;
+            g_variant_get(vState, "(v)", &inner);
+            guint32 state = g_variant_get_uint32(inner);
+            g_variant_unref(inner);
+            g_variant_unref(vState);
+
+            if (state == 100) {
+                // 3. Found the active device! Fetch ALL its properties.
+                // Note: We use the base Device interface, but you could repeat 
+                // this for .Wireless if you know it's a Wi-Fi device.
+                GVariant *allProps = g_dbus_connection_call_sync(m_conn,
+                    "org.freedesktop.NetworkManager", path, "org.freedesktop.DBus.Properties",
+                    "GetAll", g_variant_new("(s)", "org.freedesktop.NetworkManager.Device"),
+                    G_VARIANT_TYPE("(a{sv})"), G_DBUS_CALL_FLAGS_NONE, -1, nullptr, nullptr);
+
+                if (allProps) {
+                    GVariant *propDict;
+                    g_variant_get(allProps, "(@a{sv})", &propDict); // Unwrap the tuple
+
+                    GVariantIter pIter;
+                    g_variant_iter_init(&pIter, propDict);
+                    const gchar *key;
+                    GVariant *val;
+
+                    while (g_variant_iter_next(&pIter, "{sv}", &key, &val)) {
+                        details.insert(QString::fromUtf8(key), gvariantToQVariant(val));
+                        g_variant_unref(val);
+                    }
+                    
+                    // Add the path itself as a convenience
+                    details["DevicePath"] = QString::fromUtf8(path);
+
+                    g_variant_unref(propDict);
+                    g_variant_unref(allProps);
+                }
+                break; // Exit loop once active device is found
+            }
+        }
+    }
+
+    g_variant_iter_free(iter);
+    g_variant_unref(result);
+    return details;
+}
+
 QList<QVariantMap> NetworkControl::GetDevices() {
     QList<QVariantMap> devices;
     if (!m_conn) return devices;
@@ -135,6 +209,7 @@ QVariantMap NetworkControl::GetSettings(const QString &settingPath) {
 
 void NetworkControl::RequestScan(const QString &devicePath) {
     GError *error = nullptr;
+    qDebug() << "Request scan started";
 
     g_dbus_connection_call_sync(m_conn,
         "org.freedesktop.NetworkManager",
@@ -215,36 +290,11 @@ QList<QVariantMap> NetworkControl::GetAccessPoints(const QString &devicePath) {
     return aps;
 }
 
-QList<QVariantMap> NetworkControl::GetKnownNetworksInRange() {
+QList<QVariantMap> NetworkControl::GetKnownNetworksInRange(const QString &wifiDevicePath) {
     QList<QVariantMap> result;
     if (!m_conn) return result;
 
     GError *error = nullptr;
-
-    // --- Step 1: Find Wi-Fi Device Path ---
-    QString wifiDevicePath;
-    GVariant *devicesRes = g_dbus_connection_call_sync(m_conn, 
-        "org.freedesktop.NetworkManager", "/org/freedesktop/NetworkManager", 
-        "org.freedesktop.NetworkManager", "GetDevices",
-        nullptr, G_VARIANT_TYPE("(ao)"), G_DBUS_CALL_FLAGS_NONE, -1, nullptr, &error);
-
-    if (devicesRes) {
-        GVariantIter *devIter;
-        const gchar *path;
-        g_variant_get(devicesRes, "(ao)", &devIter);
-        while (g_variant_iter_loop(devIter, "o", &path)) {
-            GVariant *vType = g_dbus_connection_call_sync(m_conn, "org.freedesktop.NetworkManager", path, "org.freedesktop.DBus.Properties",
-                "Get", g_variant_new("(ss)", "org.freedesktop.NetworkManager.Device", "DeviceType"), G_VARIANT_TYPE("(v)"), G_DBUS_CALL_FLAGS_NONE, -1, nullptr, nullptr);
-            if (vType) {
-                GVariant *innerV; g_variant_get(vType, "(v)", &innerV);
-                if (g_variant_get_uint32(innerV) == 2) wifiDevicePath = QString::fromUtf8(path);
-                g_variant_unref(innerV); g_variant_unref(vType);
-                if (!wifiDevicePath.isEmpty()) break;
-            }
-        }
-        g_variant_iter_free(devIter);
-        g_variant_unref(devicesRes);
-    }
 
     if (wifiDevicePath.isEmpty()) return result;
 
@@ -370,5 +420,38 @@ void NetworkControl::ActivateConnection(const QString &devicePath, const QString
     if (error) {
         qWarning() << "ActivateConnection failed:" << error->message;
         g_error_free(error);
+    }
+}
+
+void NetworkControl::DisconnectDevice(const QString &devicePath) {
+    if (!m_conn || devicePath.isEmpty()) return;
+
+    GError *error = nullptr;
+
+    // We call Disconnect on the Device interface. 
+    // This works for both org.freedesktop.NetworkManager.Device.Wireless 
+    // and org.freedesktop.NetworkManager.Device.Wired.
+
+    // This tells the hardware to disconnect.
+    // Crucially, it also prevents the device from auto-connecting to that same
+    // network again until you manually intervene or reboot.
+
+    g_dbus_connection_call_sync(m_conn,
+        "org.freedesktop.NetworkManager",
+        devicePath.toUtf8().constData(),
+        "org.freedesktop.NetworkManager.Device",
+        "Disconnect",
+        nullptr, // No arguments required
+        nullptr, // No return value expected
+        G_DBUS_CALL_FLAGS_NONE,
+        -1,
+        nullptr,
+        &error);
+
+    if (error) {
+        qWarning() << "Disconnect failed for" << devicePath << ":" << error->message;
+        g_error_free(error);
+    } else {
+        qDebug() << "Disconnect command sent successfully to" << devicePath;
     }
 }
