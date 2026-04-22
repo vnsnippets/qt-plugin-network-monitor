@@ -11,7 +11,7 @@ A Quickshell/QML plugin that talks directly to **NetworkManager** over **DBus** 
 
 > Clean signals and properties exposed to QML
 
-**🔌 How it Works**
+**How it Works**
 
 - The Shared Bus `DBusFactory`: All components share a single System Bus connection. This minimizes overhead and prevents "Ghost Connections" or socket leaks.
 - Passive Monitoring `NetworkMonitor`:
@@ -22,7 +22,7 @@ A Quickshell/QML plugin that talks directly to **NetworkManager** over **DBus** 
 
 ---
 
-### 📡 API Reference
+### API Reference
 
 Network Monitor (Singleton) `NetworkMonitor`
 
@@ -48,8 +48,9 @@ Network Control (Singleton) `NetworkControl`
 | `ActivateConnection(dev, set, ap)` | `void`      | Connects to a specific network.                            |
 | `DisconnectDevice(path)`	         | `void`      | Forcefully drops a connection and prevents auto-reconnect. |
 
+---
 
-### 🗒️ Cheat Sheets
+### Cheat Sheets
 
 Global Network Manager State `GlobalState`
 
@@ -81,7 +82,10 @@ Connectivity `connectivityState`
 | 3     | Connected     | Limited access (local only).              |
 | 4     | Connected     | Full internet access.                     |
 
-### 🖥️ Sample QML Usage
+---
+
+### Sample QML Usage
+
 ```QML
 import QtQuick
 import NetworkMonitorPlugin
@@ -126,11 +130,14 @@ Item {
 }
 ```
 
-### ⚠️ Implementation Note
+---
+
+### Implementation Note
 
 The Active Device logic prioritizes hardware in state 100 (Connected).   
 If you have both Ethernet and Wi-Fi connected, `ActiveDevice` will reflect the `PrimaryConnection` designated by the OS, ensuring your UI always shows the correct IP and interface being used for traffic.
 
+---
 
 ### 🎉 Bottom-line
 
