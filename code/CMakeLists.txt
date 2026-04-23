@@ -33,29 +33,45 @@ qt_add_qml_module(NetworkMonitorPlugin
         NetworkControl.h NetworkControl.cpp
         DBusFactory.h DBusFactory.cpp
         Utilities.h Utilities.cpp
-        plugin.cpp
 )
 
-set_target_properties(NetworkMonitorPlugin PROPERTIES
-    INSTALL_RPATH "$ORIGIN"
-    BUILD_WITH_INSTALL_RPATH TRUE
-)
+# 4. Apply RPATH to both target libraries
+# We use '\$ORIGIN' to ensure the $ makes it into the final binary
+set(targets NetworkMonitorPlugin NetworkMonitorPluginplugin)
+foreach(target ${targets})
+    if(TARGET ${target})
+        set_target_properties(${target} PROPERTIES
+            SKIP_BUILD_RPATH FALSE
+            BUILD_WITH_INSTALL_RPATH TRUE
+            INSTALL_RPATH "\$ORIGIN"
+        )
+    endif()
+endforeach()
 
-# 4. Include directories
+# 5. Include directories
 target_include_directories(NetworkMonitorPlugin PRIVATE 
     ${GLIB_INCLUDE_DIRS}
     ${CMAKE_CURRENT_SOURCE_DIR}
 )
 
-# 5. Link libraries
+# 6. Link libraries
 target_link_libraries(NetworkMonitorPlugin PRIVATE 
     Qt6::Core
     Qt6::Qml 
     ${GLIB_LIBRARIES}
 )
 
-# 6. Refined Library Properties
+# 7. Refined Library Properties
+# IMPORTANT: Ensure the plugin target also uses the same output name logic
 set_target_properties(NetworkMonitorPlugin PROPERTIES 
     PREFIX "lib"
     LIBRARY_OUTPUT_NAME "NetworkMonitorPlugin"
 )
+
+# Force the plugin to have the correct RPATH settings as well
+if(TARGET NetworkMonitorPluginplugin)
+    set_target_properties(NetworkMonitorPluginplugin PROPERTIES
+        PREFIX "lib"
+        INSTALL_RPATH "\$ORIGIN"
+    )
+endif()
