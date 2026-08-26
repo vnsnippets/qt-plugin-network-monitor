@@ -21,6 +21,7 @@
 #include <QtQml/qqml.h> 
 #include "NetworkMonitor.h"
 #include "NetworkControl.h"
+#include "BluetoothMonitor.h"
 #include "DBusFactory.h"
 
 class NetworkMonitorPlugin : public QQmlExtensionPlugin {
@@ -31,6 +32,7 @@ class NetworkMonitorPlugin : public QQmlExtensionPlugin {
         void registerTypes(const char *uri) override {
             qmlRegisterType<NetworkMonitor>(uri, 1, 0, "NetworkMonitor");
             qmlRegisterType<NetworkControl>(uri, 1, 0, "NetworkControl");
+            qmlRegisterType<BluetoothMonitor>(uri, 1, 0, "BluetoothMonitor");
         }
 
         ~NetworkMonitorPlugin() {

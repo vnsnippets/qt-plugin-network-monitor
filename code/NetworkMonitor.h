@@ -11,6 +11,10 @@ class NetworkMonitor : public QObject {
     Q_PROPERTY(int GlobalState READ globalState NOTIFY globalStateChanged)
     Q_PROPERTY(QVariantMap ActiveDevice READ activeDevice NOTIFY activeDeviceChanged)
     Q_PROPERTY(QVariantMap ActiveAccessPoint READ activeAccessPoint NOTIFY activeAccessPointChanged)
+    Q_PROPERTY(bool wirelessEnabled READ wirelessEnabled NOTIFY wirelessEnabledChanged)
+    Q_PROPERTY(bool wirelessHardwareEnabled READ wirelessHardwareEnabled NOTIFY wirelessHardwareEnabledChanged)
+    Q_PROPERTY(bool wwanEnabled READ wwanEnabled NOTIFY wwanEnabledChanged)
+    Q_PROPERTY(bool wwanHardwareEnabled READ wwanHardwareEnabled NOTIFY wwanHardwareEnabledChanged)
     Q_DISABLE_COPY(NetworkMonitor) // Standard for singletons
 
     public:
@@ -21,10 +25,18 @@ class NetworkMonitor : public QObject {
         int globalState() const { return m_globalState; }
         QVariantMap activeDevice() const { return m_activeDevice; }
         QVariantMap activeAccessPoint() const { return m_activeAccessPoint; }
+        bool wirelessEnabled() const { return m_wirelessEnabled; }
+        bool wirelessHardwareEnabled() const { return m_wirelessHardwareEnabled; }
+        bool wwanEnabled() const { return m_wwanEnabled; }
+        bool wwanHardwareEnabled() const { return m_wwanHardwareEnabled; }
 
         void SetConnectivityState(int state);
         void SetGlobalState(int state);
         void SetActiveAccessPoint(const QVariantMap &ap);
+        void SetWirelessEnabled(bool enabled);
+        void SetWirelessHardwareEnabled(bool enabled);
+        void SetWwanEnabled(bool enabled);
+        void SetWwanHardwareEnabled(bool enabled);
         Q_INVOKABLE void RefreshActiveDevice();
 
     signals:
@@ -36,6 +48,10 @@ class NetworkMonitor : public QObject {
         void scanFinished(const QString &devicePath);
         void deviceStateChanged(const QString &path, int state);
         void activeAccessPointChanged();
+        void wirelessEnabledChanged();
+        void wirelessHardwareEnabledChanged();
+        void wwanEnabledChanged();
+        void wwanHardwareEnabledChanged();
 
         // void activeConnectionStateChanged(const QString &path, int state);
         // void newConnection(const QString &path);
@@ -56,6 +72,11 @@ class NetworkMonitor : public QObject {
         int m_globalState = 0;
         QVariantMap m_activeDevice;
         QVariantMap m_activeAccessPoint;
+
+        bool m_wirelessEnabled = false;
+        bool m_wirelessHardwareEnabled = false;
+        bool m_wwanEnabled = false;
+        bool m_wwanHardwareEnabled = false;
         
         /// Instance member to track last subscribed AP path (replaces static variable for thread safety)
         QString m_lastSubscribedApPath;

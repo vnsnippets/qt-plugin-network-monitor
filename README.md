@@ -62,6 +62,10 @@ Network Monitor (Singleton) `NetworkMonitor`
 | `GlobalState`	      | `int`         |	Network Manager's internal state (10–70).           |
 | `ActiveDevice`	  | `QVariantMap` |	Properties of the currently used hardware device.   |
 | `ActiveAccessPoint` | `QVariantMap` | SSID, Strength, and Path of current access point.   |
+| `wirelessEnabled`   | `bool`        | Whether WiFi is enabled via software.               |
+| `wirelessHardwareEnabled` | `bool`  | Whether WiFi hardware is enabled (physical switch). |
+| `wwanEnabled`       | `bool`        | Whether WWAN is enabled via software.               |
+| `wwanHardwareEnabled` | `bool`      | Whether WWAN hardware is enabled.                   |
 
 Key Signals
 
@@ -75,6 +79,10 @@ Key Signals
 | `scanFinished(string)`             | Network scanning completed (does not trigger if unchanged).          |
 | `deviceStateChanged(string, int)`  | Tracks individual hardware status.                                   |
 | `activeAccessPointChanged(string)` | Fired when roaming between Access Points or signal strength updates. |
+| `wirelessEnabledChanged()`         | WiFi software toggle changed.                                        |
+| `wirelessHardwareEnabledChanged()` | WiFi hardware switch changed.                                        |
+| `wwanEnabledChanged()`             | WWAN software toggle changed.                                        |
+| `wwanHardwareEnabledChanged()`     | WWAN hardware switch changed.                                        |
 
 Network Control (Singleton) `NetworkControl`
 
@@ -88,6 +96,18 @@ Network Control (Singleton) `NetworkControl`
 | `GetKnownNetworksInRange(path)`    | `List<Map>` | Returns SSIDs in range that you have passwords for.        |
 | `ActivateConnection(dev, set, ap)` | `void`      | Connects to a specific network.                            |
 | `DisconnectDevice(path)`	         | `void`      | Forcefully drops a connection and prevents auto-reconnect. |
+
+Bluetooth Monitor (Singleton) `BluetoothMonitor`
+
+| Property            | Type          |	Description                                         |
+|:--------------------|:--------------|:----------------------------------------------------|
+| `bluetoothEnabled`  | `bool`        | Whether Bluetooth is powered on.                    |
+
+Key Signals
+
+| Signal                     | Purpose                                      |
+|:---------------------------|:---------------------------------------------|
+| `bluetoothEnabledChanged()`| Bluetooth power state has changed.           |
 
 ---
 

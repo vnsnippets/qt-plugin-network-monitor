@@ -31,6 +31,7 @@ qt_add_qml_module(NetworkMonitorPlugin
     SOURCES
         NetworkMonitor.h NetworkMonitor.cpp
         NetworkControl.h NetworkControl.cpp
+        BluetoothMonitor.h BluetoothMonitor.cpp
         DBusFactory.h DBusFactory.cpp
         Utilities.h Utilities.cpp
 )

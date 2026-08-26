@@ -134,6 +134,24 @@ static void on_nm_properties_changed(GDBusConnection* m_dbusConn, const gchar*, 
                 }
             }, Qt::QueuedConnection);
         }
+
+        // Radio Properties
+        auto checkRadioProp = [&](const char* propName, void (NetworkMonitor::*setter)(bool)) {
+            GVariant *v = g_variant_lookup_value(changed, propName, G_VARIANT_TYPE_BOOLEAN);
+            if (v) {
+                bool val = g_variant_get_boolean(v);
+                QPointer<NetworkMonitor> q_monitor(monitorRaw);
+                QMetaObject::invokeMethod(monitorRaw, [q_monitor, setter, val]() {
+                    if (q_monitor) (q_monitor->*setter)(val);
+                }, Qt::QueuedConnection);
+                g_variant_unref(v);
+            }
+        };
+
+        checkRadioProp("WirelessEnabled", &NetworkMonitor::SetWirelessEnabled);
+        checkRadioProp("WirelessHardwareEnabled", &NetworkMonitor::SetWirelessHardwareEnabled);
+        checkRadioProp("WwanEnabled", &NetworkMonitor::SetWwanEnabled);
+        checkRadioProp("WwanHardwareEnabled", &NetworkMonitor::SetWwanHardwareEnabled);
     }
     g_variant_unref(changed);
     g_variant_unref(invalidated);
@@ -311,6 +329,26 @@ NetworkMonitor::NetworkMonitor(QObject *parent) : QObject(parent) {
     }
     
     RefreshActiveDevice();
+
+    // Initial fetch for radio states
+    auto fetchRadioState = [&](const char* propName, void (NetworkMonitor::*setter)(bool)) {
+        GVariant *res = g_dbus_connection_call_sync(m_dbusConn, "org.freedesktop.NetworkManager", "/org/freedesktop/NetworkManager", "org.freedesktop.DBus.Properties",
+            "Get", g_variant_new("(ss)", "org.freedesktop.NetworkManager", propName), G_VARIANT_TYPE("(v)"), G_DBUS_CALL_FLAGS_NONE, -1, nullptr, nullptr);
+        if (res) {
+            GVariant *inner = nullptr;
+            g_variant_get(res, "(v)", &inner);
+            if (inner) {
+                (this->*setter)(g_variant_get_boolean(inner));
+                g_variant_unref(inner);
+            }
+            g_variant_unref(res);
+        }
+    };
+
+    fetchRadioState("WirelessEnabled", &NetworkMonitor::SetWirelessEnabled);
+    fetchRadioState("WirelessHardwareEnabled", &NetworkMonitor::SetWirelessHardwareEnabled);
+    fetchRadioState("WwanEnabled", &NetworkMonitor::SetWwanEnabled);
+    fetchRadioState("WwanHardwareEnabled", &NetworkMonitor::SetWwanHardwareEnabled);
 }
 
 NetworkMonitor::~NetworkMonitor() {
@@ -633,5 +671,33 @@ void NetworkMonitor::SetActiveAccessPoint(const QVariantMap &ap) {
         m_activeAccessPoint = ap;
         emit activeAccessPointChanged();
         // Optional: qDebug() << "Active AP Strength updated:" << ap["Strength"].toInt();
+    }
+}
+
+void NetworkMonitor::SetWirelessEnabled(bool enabled) {
+    if (m_wirelessEnabled != enabled) {
+        m_wirelessEnabled = enabled;
+        emit wirelessEnabledChanged();
+    }
+}
+
+void NetworkMonitor::SetWirelessHardwareEnabled(bool enabled) {
+    if (m_wirelessHardwareEnabled != enabled) {
+        m_wirelessHardwareEnabled = enabled;
+        emit wirelessHardwareEnabledChanged();
+    }
+}
+
+void NetworkMonitor::SetWwanEnabled(bool enabled) {
+    if (m_wwanEnabled != enabled) {
+        m_wwanEnabled = enabled;
+        emit wwanEnabledChanged();
+    }
+}
+
+void NetworkMonitor::SetWwanHardwareEnabled(bool enabled) {
+    if (m_wwanHardwareEnabled != enabled) {
+        m_wwanHardwareEnabled = enabled;
+        emit wwanHardwareEnabledChanged();
     }
 }
